@@ -147,7 +147,10 @@ async def migrate(args: argparse.Namespace) -> None:
     for migration in pending:
         print(f"  - {migration.display_name()}")
 
-    applied = await manager.apply_migrations(app=app)
+    applied = []
+    async for migration in manager.apply_migrations_async(app=app):
+        print(f"Applied migration: {migration.display_name()}")
+        applied.append(migration)
 
     if applied:
         print(f"Successfully applied {len(applied)} migration(s).")
