@@ -2,7 +2,6 @@ from collections import defaultdict
 import inspect
 import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Type, cast
 
 from tortoise import Tortoise
 
@@ -11,6 +10,7 @@ from tortoise_pathway.operations.operation import Operation
 from tortoise_pathway.schema_differ import SchemaDiffer
 from tortoise_pathway.state import State
 from tortoise_pathway.generators import generate_empty_migration, generate_auto_migration
+from typing import AsyncGenerator, Dict, List, Optional, Type, cast
 
 
 class MigrationManager:
@@ -184,7 +184,9 @@ class MigrationManager:
 
         return new_migrations
 
-    async def apply_migrations(self, app: str = None, connection=None) -> List[Type[Migration]]:
+    async def apply_migrations_async(
+        self, app: str = None, connection=None
+    ) -> AsyncGenerator[Type[Migration]]:
         """
         Apply pending migrations.
 
@@ -216,13 +218,23 @@ class MigrationManager:
                 )
 
                 self.applied_migrations.add((migration.app_name, migration_name))
-                applied_migrations.append(migration)
                 self.applied_state.snapshot(migration_name)
-                print(f"Applied migration: {migration.display_name()}")
+                yield migration
             except Exception as e:
                 print(f"Error applying migration {migration.display_name()}: {e}")
                 # Rollback transaction if supported
                 raise
+
+    async def apply_migrations(self, app: str = None, connection=None) -> List[Type[Migration]]:
+        """
+        Apply pending migrations.
+
+        Returns:
+            List of Migration instances that were applied
+        """
+        applied_migrations = []
+        async for migration in self.apply_migrations_async(app, connection):
+            applied_migrations.append(migration)
 
         return applied_migrations
 
